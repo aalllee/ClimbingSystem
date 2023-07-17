@@ -27,6 +27,10 @@ void UCustomMovementComponent::OnMovementModeChanged(EMovementMode PreviousMovem
 	{
 		bOrientRotationToMovement = true;
 		CharacterOwner->GetCapsuleComponent()->SetCapsuleHalfHeight(96.f);
+
+		const FRotator DirtyRotation = UpdatedComponent->GetComponentRotation();
+		const FRotator CleanStandRotation = FRotator(0.f, DirtyRotation.Yaw, 0.f);
+		UpdatedComponent->SetRelativeRotation(CleanStandRotation);
 		StopMovementImmediately();
 	}
 
@@ -173,6 +177,12 @@ void UCustomMovementComponent::PhysicsClimb(float deltaTime, int32 Iterations)
 
 
 	//Check if we should stop climbing
+	if (CheckShouldStopClimbing())
+	{
+		StopClimbing();
+	
+	}
+
 	RestorePreAdditiveRootMotionVelocity();
 
 	if (!HasAnimRootMotion() && !CurrentRootMotion.HasOverrideVelocity())
@@ -211,15 +221,31 @@ void UCustomMovementComponent::ProcessClimbableSurfaceInfo()
 
 	for (const FHitResult& TracedHitResult : ClimbableSurfacesTracedResults)
 	{
-		CurrentClimbableSurfaceLocation += TracedHitResult.ImpactNormal;
+		CurrentClimbableSurfaceLocation += TracedHitResult.ImpactPoint;
 		CurrentClimbableSurfaceNormal += TracedHitResult.ImpactNormal;
 		
 	}
 	CurrentClimbableSurfaceLocation /= ClimbableSurfacesTracedResults.Num();
 	CurrentClimbableSurfaceNormal = CurrentClimbableSurfaceNormal.GetSafeNormal();
 
-	Debug::Print(CurrentClimbableSurfaceLocation.ToCompactString());
-	Debug::Print(CurrentClimbableSurfaceNormal.ToCompactString());
+	//Debug::Print(CurrentClimbableSurfaceLocation.ToCompactString());
+	//Debug::Print(CurrentClimbableSurfaceNormal.ToCompactString());
+}
+bool UCustomMovementComponent::CheckShouldStopClimbing()
+{
+	if (ClimbableSurfacesTracedResults.IsEmpty()) return true;
+
+	const float DotResult = FVector::DotProduct(CurrentClimbableSurfaceNormal, FVector::UpVector);
+	const float DegreeDiff = FMath::RadiansToDegrees(FMath::Acos(DotResult));
+
+	Debug::Print(FString::SanitizeFloat(DegreeDiff), FColor::Cyan,1);
+
+	if (DegreeDiff <= 60.f)
+	{
+		return true;
+	}
+
+	return false;
 }
 FQuat UCustomMovementComponent::GetClimbRotation(float DeltaTime)
 {
