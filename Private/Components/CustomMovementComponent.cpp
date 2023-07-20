@@ -17,6 +17,7 @@ void UCustomMovementComponent::TickComponent(float DeltaTime, ELevelTick TickTyp
 	Super::TickComponent(DeltaTime,TickType, ThisTickFunction);
 	//TraceClimbableSurfaces();
 	//TraceFromEyeHeight(100.f);
+	//CanClimbDownLedge();
 
 }
 void UCustomMovementComponent::OnMovementModeChanged(EMovementMode PreviousMovementMode, uint8 PreviousCustomMode)
@@ -186,6 +187,30 @@ bool UCustomMovementComponent::CanStartClimbing()
 	if (!TraceFromEyeHeight(100.f).bBlockingHit) return false;
 
 	return true;
+}
+bool UCustomMovementComponent::CanClimbDownLedge()
+{
+	if (IsFalling()) return false;
+
+	const FVector ComponentLocation = UpdatedComponent->GetComponentLocation();
+	const FVector ComponentForward = UpdatedComponent->GetForwardVector();
+	const FVector DownVector = -UpdatedComponent->GetUpVector();
+
+	const FVector WalkableSurfaceTraceStart = ComponentLocation + ComponentForward * ClimbDownWalkableSurfaceTraceOffset;
+	const FVector WalkableSurfaceTraceEnd = WalkableSurfaceTraceStart + DownVector * 100.f;
+
+	FHitResult SurfaceHit = DoLineTraceSingleByObject(WalkableSurfaceTraceStart, WalkableSurfaceTraceEnd, true);
+	
+	const FVector LedgeTraceStart = SurfaceHit.TraceStart + ComponentForward * ClimbDownLedgeTraceOffset;
+	const FVector LedgeTraceEnd = LedgeTraceStart + DownVector * 200.f;
+	
+	FHitResult LedgeHit = DoLineTraceSingleByObject(LedgeTraceStart, LedgeTraceEnd, true);
+	
+	if (SurfaceHit.bBlockingHit && !LedgeHit.bBlockingHit)
+	{
+		return true;
+	}
+	return false;
 }
 void UCustomMovementComponent::StartClimbing()
 {
@@ -396,11 +421,12 @@ void UCustomMovementComponent::PlayClimbMontage(UAnimMontage* MontageToPlay)
 void UCustomMovementComponent::OnClimbMontageEnded(UAnimMontage* Montage, bool bInterrupted)
 {
 
-	if (Montage == IdleToClimbMontage)
+	if (Montage == IdleToClimbMontage || Montage == ClimbDownLedgeMontage)
 	{
 		StartClimbing();
+		StopMovementImmediately();
 	}
-	else
+	if(Montage == ClimbToTopMontage)
 	{
 		SetMovementMode(MOVE_Walking);
 	}
@@ -414,13 +440,19 @@ void UCustomMovementComponent::ToggleClimbing(bool bEnableClimb)
 		Debug::Print(TEXT("Enable Climbing"));
 		if (CanStartClimbing())
 		{
-			Debug::Print(TEXT("Can Start Climbing"));
+			
 			PlayClimbMontage(IdleToClimbMontage);
 			//StartClimbing();
 		}
+		else if(CanClimbDownLedge())
+		{
+			PlayClimbMontage(ClimbDownLedgeMontage);
+			Debug::Print(TEXT("Can CLIMB DOWN"),FColor::Orange,1);
+		}
 		else
 		{
-			Debug::Print(TEXT("CanNOT Start Climbing"));
+			Debug::Print(TEXT("CanNOT CLIMB DOWN"), FColor::Red, 1);
+
 		
 		}
 	
