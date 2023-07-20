@@ -6,6 +6,10 @@
 #include "ClimbingSystem/ClimbingSystemCharacter.h"
 #include "ClimbingSystem/DebugHelper.h"
 #include "Components/CapsuleComponent.h"
+#include "Kismet/KismetMathLibrary.h"
+
+
+
 
 #pragma region ClimbTraces
 void UCustomMovementComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
@@ -131,6 +135,17 @@ FHitResult UCustomMovementComponent::DoLineTraceSingleByObject(const FVector& St
 
 
 #pragma region ClimbCore
+void UCustomMovementComponent::BeginPlay()
+{
+	Super::BeginPlay();
+	OwningPlayerAnimInstance = CharacterOwner->GetMesh()->GetAnimInstance();
+
+	if (OwningPlayerAnimInstance)
+	{
+		OwningPlayerAnimInstance->OnMontageEnded.AddDynamic(this, &UCustomMovementComponent::OnClimbMontageEnded);
+		OwningPlayerAnimInstance->OnMontageBlendingOut.AddDynamic(this, &UCustomMovementComponent::OnClimbMontageEnded);
+	}
+}
 bool UCustomMovementComponent::TraceClimbableSurfaces()
 {
 	const FVector StartOffset = UpdatedComponent->GetForwardVector() * 30.f;
@@ -273,6 +288,39 @@ void UCustomMovementComponent::SnapMovementToClimbableSurfaces(float DeltaTime)
 		true
 	);
 }
+void UCustomMovementComponent::PlayClimbMontage(UAnimMontage* MontageToPlay)
+{
+	if (!MontageToPlay)
+	{
+		Debug::Print(TEXT("Montage is NULL"));
+		return;
+	}
+	
+
+
+	if (!OwningPlayerAnimInstance)
+	{
+		Debug::Print(TEXT("Anim Instance is NULL"));
+		return;
+	}
+	if (OwningPlayerAnimInstance->IsAnyMontagePlaying())
+	{
+		Debug::Print(TEXT("Other Montage is Playing"));
+		return;
+	}
+	Debug::Print(TEXT("PlayMontage"));
+	OwningPlayerAnimInstance->Montage_Play(MontageToPlay);
+
+}
+void UCustomMovementComponent::OnClimbMontageEnded(UAnimMontage* Montage, bool bInterrupted)
+{
+
+	if (Montage == IdleToClimbMontage)
+	{
+		StartClimbing();
+	}
+	Debug::Print(TEXT("Climb Montage Ended"));
+}
 void UCustomMovementComponent::ToggleClimbing(bool bEnableClimb)
 {
 	if (bEnableClimb)
@@ -282,7 +330,8 @@ void UCustomMovementComponent::ToggleClimbing(bool bEnableClimb)
 		if (CanStartClimbing())
 		{
 			Debug::Print(TEXT("Can Start Climbing"));
-			StartClimbing();
+			PlayClimbMontage(IdleToClimbMontage);
+			//StartClimbing();
 		}
 		else
 		{
@@ -299,5 +348,10 @@ void UCustomMovementComponent::ToggleClimbing(bool bEnableClimb)
 bool UCustomMovementComponent::IsClimbing() const
 {
 	return MovementMode == MOVE_Custom && CustomMovementMode == ECustomMovementMode::MOVE_Climb;
+}
+FVector UCustomMovementComponent::GetUnrotatedClimbVelocity() const
+{
+	return UKismetMathLibrary::Quat_UnrotateVector(UpdatedComponent->GetComponentQuat(),Velocity);
+	
 }
 #pragma endregion
