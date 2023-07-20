@@ -33,6 +33,7 @@ public:
 	virtual void PhysCustom(float deltaTime, int32 Iterations) override;
 	virtual float GetMaxSpeed() const override;
 	virtual float GetMaxAcceleration() const override;
+	virtual FVector ConstrainAnimRootMotionVelocity(const FVector& RootMotionVelocity, const FVector& CurrentVelocity) const override;
 private:
 #pragma region ClimbTraces
 	TArray<FHitResult> DoCapsuleTraceMultiByObject(const FVector& Start,const FVector& End, bool bShowDebug = false, bool bDrawPersistentShapes = false);
@@ -49,8 +50,10 @@ private:
 	void PhysicsClimb(float deltaTime, int32 Iterations);
 	void ProcessClimbableSurfaceInfo();
 	bool CheckShouldStopClimbing();
+	bool CheckHasReachedFloor();
 	FQuat GetClimbRotation(float DeltaTime);
 	void SnapMovementToClimbableSurfaces(float DeltaTime);
+	bool CheckHasReachedLedge();
 	void PlayClimbMontage(UAnimMontage* MontageToPlay);
 
 	UFUNCTION()
@@ -90,6 +93,10 @@ private:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Character Movement: Climbing", meta = (AllowPrivateAccess = "true"))
 
 	UAnimMontage* IdleToClimbMontage;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Character Movement: Climbing", meta = (AllowPrivateAccess = "true"))
+
+		UAnimMontage* ClimbToTopMontage;
 #pragma endregion
 
 public:
